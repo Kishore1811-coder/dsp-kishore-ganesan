@@ -1,42 +1,11 @@
 import numpy as np
 import joblib
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
+
 from house_prices import CONTINUOUS_FEATURES, CATEGORICAL_FEATURES, MODELS_DIR
 
 
-def fill_continuous(df, ref):
-    """Fill missing continuous values using median of reference set.
-
-    Args:
-        df: DataFrame to fill.
-        ref: Reference DataFrame for computing medians.
-
-    Returns:
-        DataFrame with continuous NaNs filled.
-    """
-    df = df.copy()
-    for col in CONTINUOUS_FEATURES:
-        df[col] = df[col].fillna(ref[col].median())
-    return df
-
-
-def fill_categorical(df, ref):
-    """Fill missing categorical values using mode of reference set.
-
-    Args:
-        df: DataFrame to fill.
-        ref: Reference DataFrame for computing modes.
-
-    Returns:
-        DataFrame with categorical NaNs filled.
-    """
-    df = df.copy()
-    for col in CATEGORICAL_FEATURES:
-        df[col] = df[col].fillna(ref[col].mode()[0])
-    return df
-
-
-def scale_continuous(df, is_training: bool) -> np.ndarray:
+def scale_features(df, is_training):
     """Scale continuous features using StandardScaler.
 
     Args:
@@ -58,7 +27,7 @@ def scale_continuous(df, is_training: bool) -> np.ndarray:
     return scaler.transform(df[CONTINUOUS_FEATURES])
 
 
-def encode_categorical(df, is_training: bool) -> np.ndarray:
+def encode_features(df, is_training):
     """Encode categorical features using OneHotEncoder.
 
     Args:
@@ -80,19 +49,16 @@ def encode_categorical(df, is_training: bool) -> np.ndarray:
     return encoder.transform(df[CATEGORICAL_FEATURES])
 
 
-def preprocess(df, ref, is_training: bool = False) -> np.ndarray:
+def preprocess(df, is_training=False):
     """Preprocess features for training or inference.
 
     Args:
         df: Raw dataframe with feature columns.
-        ref: Reference dataframe for imputation statistics.
         is_training: If True, fit and save transformers.
 
     Returns:
         Preprocessed numpy array ready for model.
     """
-    df = fill_continuous(df, ref)
-    df = fill_categorical(df, ref)
-    cont_array = scale_continuous(df, is_training)
-    cat_array = encode_categorical(df, is_training)
+    cont_array = scale_features(df, is_training)
+    cat_array = encode_features(df, is_training)
     return np.hstack([cont_array, cat_array])

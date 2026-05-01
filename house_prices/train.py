@@ -10,28 +10,82 @@ from house_prices.preprocess import preprocess
 
 
 def load_data(filepath):
-    # load csv and check it exists
+    """Load CSV file and check it exists.
+
+    Args:
+        filepath: Path to CSV file.
+
+    Returns:
+        Loaded DataFrame.
+    """
     if not pd.io.common.file_exists(filepath):
         raise FileNotFoundError(f"Training file not found: {filepath}")
     return pd.read_csv(filepath)
 
 
 def split_data(df):
-    # split into train and test before any preprocessing
+    """Split data into train and test sets.
+
+    Args:
+        df: Full DataFrame with features and label.
+
+    Returns:
+        X_train, X_test, y_train, y_test splits.
+    """
     X = df[FEATURE_COLUMNS].copy()
     y = df[LABEL_COLUMN].copy()
     return train_test_split(X, y, test_size=0.2, random_state=42)
 
 
+def fill_missing(X_train, X_test):
+    """Fill missing values using train set statistics.
+
+    Args:
+        X_train: Training features DataFrame.
+        X_test: Test features DataFrame.
+
+    Returns:
+        Filled X_train and X_test DataFrames.
+    """
+    from house_prices import CONTINUOUS_FEATURES, CATEGORICAL_FEATURES
+    X_train = X_train.copy()
+    X_test = X_test.copy()
+    for col in CONTINUOUS_FEATURES:
+        median_val = X_train[col].median()
+        X_train[col] = X_train[col].fillna(median_val)
+        X_test[col] = X_test[col].fillna(median_val)
+    for col in CATEGORICAL_FEATURES:
+        mode_val = X_train[col].mode()[0]
+        X_train[col] = X_train[col].fillna(mode_val)
+        X_test[col] = X_test[col].fillna(mode_val)
+    return X_train, X_test
+
+
 def compute_rmsle(y_test, y_pred):
-    # compute the competition metric
+    """Compute the competition metric RMSLE.
+
+    Args:
+        y_test: True target values.
+        y_pred: Predicted values.
+
+    Returns:
+        Rounded RMSLE score.
+    """
     y_pred = np.clip(y_pred, 1, None)
     rmsle = np.sqrt(mean_squared_log_error(y_test, y_pred))
     return round(rmsle, 2)
 
 
 def train_model(X_train_processed, y_train):
-    # fit a linear regression model and save it
+    """Fit a linear regression model and save it.
+
+    Args:
+        X_train_processed: Preprocessed training features.
+        y_train: Training target values.
+
+    Returns:
+        Trained model.
+    """
     model = LinearRegression()
     model.fit(X_train_processed, y_train)
     joblib.dump(model, MODELS_DIR / "model.joblib")
@@ -49,13 +103,9 @@ def build_model(filepath):
     """
     df = load_data(filepath)
     X_train, X_test, y_train, y_test = split_data(df)
-
-    X_train_processed = preprocess(X_train, X_train, is_training=True)
-    X_test_processed = preprocess(X_test, X_train, is_training=False)
-
+    X_train, X_test = fill_missing(X_train, X_test)
+    X_train_processed = preprocess(X_train, is_training=True)
+    X_test_processed = preprocess(X_test, is_training=False)
     model = train_model(X_train_processed, y_train)
-
     y_pred = model.predict(X_test_processed)
-    rmsle = compute_rmsle(y_test.values, y_pred)
-
-    return {"rmsle": rmsle}
+    return {"rmsle": compute_rmsle(y_test.values, y_pred)}
